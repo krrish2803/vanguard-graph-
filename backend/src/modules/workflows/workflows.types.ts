@@ -1,48 +1,16 @@
-export enum WorkflowAction {
-  ALLOW = 'ALLOW',
-  STEP_UP_AUTH = 'STEP_UP_AUTH',
-  FLAG_FOR_REVIEW = 'FLAG_FOR_REVIEW',
-  NOTIFY = 'NOTIFY',
-  ESCALATE = 'ESCALATE',
-  BLOCK = 'BLOCK',
-}
+import { z } from "zod";
 
-export enum WorkflowStatus {
-  PENDING = 'PENDING',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
-}
+export const MerchantEventSchema = z.object({
+  merchantId: z.string().min(1),
+  businessName: z.string().min(1),
+  email: z.string().email(),
+  phone: z.string().min(6),
+  deviceFingerprint: z.string().min(1),
+  ipAddress: z.string().min(1),
+  bankAccountNumber: z.string().min(1),
+  bankRoutingNumber: z.string().min(1),
+  eventType: z.enum(["ONBOARDING", "PAYOUT_CHANGE"]).default("ONBOARDING"),
+  timestamp: z.string().default(() => new Date().toISOString()),
+});
 
-export enum StepStatus {
-  PENDING = 'PENDING',
-  SUCCESS = 'SUCCESS',
-  FAILED = 'FAILED',
-  SKIPPED = 'SKIPPED',
-}
-
-export interface WorkflowStep {
-  action: WorkflowAction;
-  status: StepStatus;
-  reason?: string;
-  executedAt?: string;
-  error?: string;
-}
-
-export interface Workflow {
-  id: string;
-  transactionId: string;
-  riskScore: number;
-  triggeredRules: string[];
-  status: WorkflowStatus;
-  steps: WorkflowStep[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Input jo risk module se aata hai
-export interface RiskDecisionInput {
-  transactionId: string;
-  riskScore: number;       // 0–100
-  triggeredRules: string[]; // e.g. ['VELOCITY_5MIN', 'GEO_MISMATCH']
-}
+export type MerchantEventInput = z.infer<typeof MerchantEventSchema>;

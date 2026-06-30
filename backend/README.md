@@ -1,129 +1,129 @@
-# Vanguard Graph
-**Fraud Coordination Intelligence Engine — Catch fraud rings before money moves.**
+# Vanguard Graph — Backend
 
-> Built for Namespace Hackathon AH6926 • Neo4j Track • Render Workflows Track
+> **Naitik's domain:** Render Workflows + AI Layer + Signal Enrichment
 
----
-
-## The Problem
-
-Platforms verify individual merchants at onboarding. They check if *this* email is valid, if *this* bank account is real. But they miss the pattern: **Merchant A shares a device with Merchant B, who routes payouts to the same bank account as flagged Merchant C.** Flat SQL checks can't see the graph.
-
-## The Solution
-
-Vanguard Graph connects every signal into a Neo4j knowledge graph — devices, IPs, bank accounts, emails, phones — then traverses second-degree connections to detect coordinated fraud rings that individual checks would miss. An AI investigator (Claude) translates graph findings into plain-language risk memos. Render Workflows powers the durable investigation pipeline.
+Fraud coordination intelligence engine for digital platforms. Converts onboarding and transaction signals into a live relationship graph, then runs a durable investigation workflow that scores risk, explains suspicious connections, and flags fraud rings before money moves.
 
 ---
 
-## Hero Features
-
-- **🔄 Ring Replay** — Visual timeline of how a fraud ring assembled. See each merchant join, each shared device appear, each bank account link. Play forward, pause, inspect.
-- **🧠 Explainable AI Risk Memo** — Claude claude-sonnet-4-6 converts raw Cypher output into readable investigator notes: *"Merchant shares device D-773 with 4 others. Two route to bank account #4421, already linked to a confirmed fraud case."*
-- **🕸️ Path Explorer** — Click any merchant node. Graph highlights direct and second-degree connections. One click from a merchant to their fraud ring.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14, TypeScript, Tailwind CSS |
-| Backend | Node.js, Express, TypeScript, Prisma |
-| Graph DB | Neo4j AuraDB |
-| Workflow Engine | Render Workflows |
-| AI | Claude claude-sonnet-4-6 (Anthropic) |
-| Relational DB | PostgreSQL (Neon) |
-| Cache / Rate Limiting | Redis (Upstash) |
-
-## Architecture
-
-```
-                         ┌──────────────────┐
-                         │   Next.js App    │
-                         │ (Frontend, TS)   │
-                         └────────┬─────────┘
-                                  │ REST API
-                         ┌────────▼─────────┐
-                         │  Express Server  │
-                         │ (Backend, TS)    │
-                         └──┬────┬────┬─────┘
-                            │    │    │
-                    ┌───────┘    │    └──────────┐
-                    ▼            ▼               ▼
-             ┌──────────┐ ┌──────────┐ ┌────────────────┐
-             │PostgreSQL│ │  Redis   │ │   Neo4j AuraDB │
-             │(Prisma)  │ │(Upstash) │ │ (Knowledge     │
-             │          │ │          │ │  Graph)        │
-             └──────────┘ └──────────┘ └────────────────┘
-                                         │
-                                    ┌────▼────┐
-                                    │ Render  │
-                                    │Workflows│
-                                    └────┬────┘
-                                         │
-                                    ┌────▼────┐
-                                    │ Claude  │
-                                    │ AI      │
-                                    └─────────┘
-```
+## Stack
+- **Runtime:** Node.js + TypeScript
+- **Framework:** Express
+- **Graph DB:** Neo4j AuraDB (Cypher)
+- **AI:** Anthropic Claude (claude-3-5-haiku) or mock mode
+- **Workflows:** Render Workflows (external trigger) + in-process fallback
+- **Enrichment:** Mock device, IP, email, KYC services (swap for real APIs)
 
 ---
 
 ## Quick Start
 
 ```bash
-# Clone
-git clone https://github.com/krrish2803/vanguard-graph-.git
-cd vanguard-graph-
-
-# Backend
-cd backend
+# 1. Install
 npm install
-cp .env.example .env        # fill in your values
-npx prisma migrate deploy
-npm run seed
-npm run dev                 # starts on :4000
 
-# Frontend (new terminal)
-cd ../frontend
-npm install
-npm run dev                 # starts on :3000
+# 2. Configure
+cp .env.example .env
+# Fill in NEO4J_URI, NEO4J_PASSWORD, ANTHROPIC_API_KEY
+# Set AI_PROVIDER=mock for local dev without Anthropic key
+
+# 3. Seed demo data into Neo4j
+npx ts-node src/scripts/backfill-graph.ts
+
+# 4. Run dev server
+npm run dev
 ```
 
 ---
 
-## API Endpoints Summary
+## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | /api/v1/merchants | Onboard new merchant |
-| GET | /api/v1/merchants | List merchants (paginated, filterable) |
-| GET | /api/v1/merchants/:id | Get merchant by ID |
-| PATCH | /api/v1/merchants/:id | Update merchant |
-| POST | /api/v1/merchants/:id/payout-change | Trigger payout change workflow |
-| GET | /api/v1/alerts | List alerts (filterable) |
-| GET | /api/v1/alerts/:id | Get alert by ID |
-| PATCH | /api/v1/alerts/:id/status | Update alert status |
-| GET | /api/v1/health | System health check |
+### Trigger Investigation
+```
+POST /api/workflows/trigger
+Content-Type: application/json
 
-Full docs at [`docs/api-reference.md`](docs/api-reference.md).
+{
+  "merchantId": "M-NEW-001",
+  "businessName": "Suspicious Merchant LLC",
+  "email": "fraud123@mailinator.com",
+  "phone": "+1-555-9999",
+  "deviceFingerprint": "FP-DEMO-001",
+  "ipAddress": "45.12.34.99",
+  "bankAccountNumber": "ACCT-442",
+  "bankRoutingNumber": "021000021",
+  "eventType": "ONBOARDING"
+}
+
+→ 202 { "investigationId": "uuid", "status": "TRIGGERED" }
+```
+
+### Get Investigation
+```
+GET /api/workflows/:id
+→ Full InvestigationResult with score, graphLinks, aiMemo, timeline
+```
+
+### List All Investigations
+```
+GET /api/workflows
+→ Array of InvestigationResult (newest first)
+```
+
+### Take Action
+```
+POST /api/workflows/:id/action
+{ "action": "BLOCK" | "REVIEW" | "APPROVE" }
+```
 
 ---
 
-## Team
+## Demo Scenario
 
-| Name | Role |
-|------|------|
-| Krrish | Frontend + Core Backend (Server, Merchants, Alerts) + Docs + PPT |
-| Anurag | Neo4j Graph Schema + Fraud Detection Rules + Risk Scoring + Backend APIs |
-| Naitik | Render Workflows + AI Layer (Claude integration) + Enrichment Services |
-| Shreya | Full Frontend (all pages, components, features) |
+Run the backfill script first, then trigger an investigation for a new merchant that shares the demo device fingerprint `FP-DEMO-001` and bank account `ACCT-442`. The system will:
+
+1. Enrich signals (device, IP, email, KYC)
+2. Upsert graph nodes in Neo4j
+3. Traverse graph → finds shared device with 3 merchants + shared bank with 2 flagged merchants
+4. Score: 35 (shared bank) + 25 (device × 3) + 15 (fraud case proximity) = **75 → HIGH**
+5. Generate AI memo explaining the fraud ring pattern
+6. Recommend: **BLOCK**
 
 ---
 
-## Hackathon Tracks
+## Risk Scoring Logic
 
-| Track | How We Use It |
-|-------|---------------|
-| ✅ Neo4j AuraDB | Knowledge graph of merchants, devices, bank accounts, IPs — Cypher queries detect shared entities and multihop fraud patterns |
-| ✅ Render Workflows | Durable async pipelines for merchant onboarding investigation and payout-change re-evaluation — retry-safe, checkpoint-recoverable |
+| Factor | Points |
+|--------|--------|
+| Shared bank account with another merchant | +35 |
+| Shared device with 2+ merchants | +25 |
+| Shared device with 1 merchant | +15 |
+| Fraud case proximity (2nd degree) | +15 |
+| Risky IP (linked fraud cases) | +15 |
+| Watchlist hit (KYC) | +20 |
+| Disposable email | +10 |
+| Rapid payout change (<24h) | +10 |
+
+Score thresholds: `0-29 LOW` · `30-59 MEDIUM` · `60-100 HIGH`
+
+---
+
+## File Structure
+
+```
+src/
+├── config/          # Neo4j + Anthropic client setup
+├── routes/          # Express route definitions
+├── modules/workflows/  # Controller → Service → Repository layer
+├── services/
+│   ├── render/      # Render Workflow trigger + status
+│   ├── ai/          # Anthropic provider, mock provider, prompts, guardrails
+│   ├── enrichment/  # Device, IP, email, KYC signal enrichment
+│   └── notifications/ # Slack + webhook
+├── workflows/
+│   ├── merchant-onboarding/  # Main investigation workflow + activities
+│   ├── payout-change/        # Payout-specific workflow (extends onboarding)
+│   └── shared/               # Logger, retry policy, activity context, types
+└── scripts/
+    └── backfill-graph.ts     # Seed demo data into Neo4j
+```
