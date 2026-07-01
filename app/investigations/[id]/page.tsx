@@ -1,7 +1,12 @@
 "use client";
-import { useState } from "react";
-import { mockMerchants, mockMemo } from "@/lib/mock-data";
+import { useState, useEffect } from "react";
 import { use } from "react";
+
+function riskColor(level: string) {
+  if (level === "high" || level === "High") return "text-red-600";
+  if (level === "medium" || level === "Medium") return "text-yellow-600";
+  return "text-green-600";
+}
 
 export default function InvestigationPage({
   params,
@@ -9,31 +14,68 @@ export default function InvestigationPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const merchant = mockMerchants.find((m) => m.id === id);
+  const [merchant, setMerchant] = useState<any>(null);
+  const [alert, setAlert] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [action, setAction] = useState<string | null>(null);
 
-  if (!merchant) return <div className="p-8">Merchant not found.</div>;
+  useEffect(() => {
+    fetch(`http://localhost:4000/api/v1/merchants/${id}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success) {
+          setMerchant(json.data);
+        } else {
+          setError(true);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        setError(true);
+        setLoading(false);
+      });
+
+    fetch(`http://localhost:4000/api/v1/alerts?merchantId=${id}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data?.length > 0) {
+          setAlert(json.data[0]);
+        }
+      })
+      .catch(() => {});
+  }, [id]);
+
+  if (loading) return <div className="p-8 text-gray-500">Loading investigation...</div>;
+  if (error || !merchant) return <div className="p-8 text-red-500">Merchant not found or backend is offline.</div>;
 
   return (
     <main className="p-8 space-y-6">
       <h1 className="text-2xl font-bold">{merchant.name} — {merchant.id}</h1>
 
       <div className="p-4 border rounded">
-        <p className="font-semibold">Risk Score: {merchant.riskScore} ({merchant.riskLevel})</p>
+        <p className="font-semibold">
+          Risk Score: <span className={riskColor(merchant.riskLevel)}>{merchant.riskScore} ({merchant.riskLevel})</span>
+        </p>
+        <p className="text-sm text-gray-500 mt-1">Status: {merchant.status}</p>
       </div>
 
-      <div className="p-4 border rounded bg-gray-50">
-        <h2 className="font-semibold mb-2">AI Risk Memo</h2>
-        <p>{mockMemo[merchant.id] ?? "No suspicious connections found."}</p>
-      </div>
+      {alert && (
+        <div className="p-4 border rounded bg-gray-50">
+          <h2 className="font-semibold mb-2">AI Risk Memo</h2>
+          <p>{alert.summary}</p>
+        </div>
+      )}
 
       <div className="p-4 border rounded">
         <h2 className="font-semibold mb-2">Linked Entities</h2>
-        <p>Shared Device: {merchant.sharedDevice ?? "None"}</p>
-        <p>Shared Bank Account: {merchant.sharedBankAccount ?? "None"}</p>
+        <p>Device Fingerprint: {merchant.deviceFingerprint ?? "None"}</p>
+        <p>Bank Account: {merchant.bankAccountNumber ?? "None"}</p>
+        <p>IFSC: {merchant.bankAccountIfsc ?? "None"}</p>
+        <p>IP Address: {merchant.ipAddress ?? "None"}</p>
       </div>
 
-      {(merchant.sharedDevice || merchant.sharedBankAccount) && (
+      {(merchant.deviceFingerprint || merchant.bankAccountNumber) && (
         <div className="p-6 border rounded bg-white">
           <h2 className="font-semibold mb-4">Relationship Graph</h2>
           <div className="flex items-center justify-center gap-6 flex-wrap">
@@ -41,22 +83,20 @@ export default function InvestigationPage({
               {merchant.name}
               <div className="text-xs text-gray-500">{merchant.id}</div>
             </div>
-
-            {merchant.sharedDevice && (
+            {merchant.deviceFingerprint && (
               <>
-                <div className="text-gray-400">──connected via device──&gt;</div>
+                <div className="text-gray-400">──device──&gt;</div>
                 <div className="px-4 py-3 bg-yellow-100 border border-yellow-400 rounded text-center">
-                  Device {merchant.sharedDevice}
+                  Device {merchant.deviceFingerprint}
                 </div>
               </>
             )}
-
-            {merchant.sharedBankAccount && (
+            {merchant.bankAccountNumber && (
               <>
-                <div className="text-gray-400">──shares payout──&gt;</div>
+                <div className="text-gray-400">──payout──&gt;</div>
                 <div className="px-4 py-3 bg-orange-100 border border-orange-400 rounded text-center">
-                  Bank Account {merchant.sharedBankAccount}
-                  <div className="text-xs text-gray-500">Linked to flagged case</div>
+                  Bank {merchant.bankAccountNumber}
+                  <div className="text-xs text-gray-500">{merchant.bankAccountIfsc}</div>
                 </div>
               </>
             )}
